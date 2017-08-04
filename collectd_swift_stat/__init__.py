@@ -47,7 +47,7 @@ def read(data=None):
             metric.plugin = 'swift_stat'
             metric.interval = INTERVAL
             metric.type = 'gauge'
-            metric.type_instance = m_instance
+            metric.type_instance = name
             metric.values = [stats[m_instance]]
             metric.dispatch()
         else:
