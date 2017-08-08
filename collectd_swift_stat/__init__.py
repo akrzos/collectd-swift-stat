@@ -19,62 +19,99 @@ import collectd
 import os
 import time
 
-SWIFT_STATS = {
-    'x-account-object-count': 'objects',
-    'x-account-container-count': 'containers',
-    'x-account-bytes-used': 'bytes'}
 
+class CollectdSwiftStat(object):
+    SWIFT_STATS = {
+        'x-account-object-count': 'objects',
+        'x-account-container-count': 'containers',
+        'x-account-bytes-used': 'bytes'}
 
-def configure(configobj):
-    global INTERVAL
+    def __init__(self):
+        self.interval = 10
+        self.prefix = None
+        self.user = None
+        self.password = None
+        self.authurl = None
+        self.project = None
+        self.swift_conn = None
 
-    config = {c.key: c.values for c in configobj.children}
-    INTERVAL = 10
-    if 'interval' in config:
-        INTERVAL = config['interval'][0]
-    collectd.info('swift_stat: Interval: {}'.format(INTERVAL))
-    collectd.register_read(read, INTERVAL)
+    def configure_callback(self, configobj):
+        for node in configobj.children:
+            val = str(node.values[0])
+            if node.key == 'Interval':
+                self.interval = int(float(val))
+            elif node.key == 'Prefix':
+                self.prefix = val
+            elif node.key == 'User':
+                self.user = val
+            elif node.key == 'Password':
+                self.password = val
+            elif node.key == 'AuthURL':
+                self.authurl = val
+            elif node.key == 'Project':
+                self.project = val
+            else:
+                collectd.warning(
+                    'collectd-swift-stat: Unknown config key: {}'
+                    .format(node.key))
 
+        read_plugin = True
+        if not self.prefix:
+            collectd.error('collectd-swift-stat: Prefix Undefined')
+            read_plugin = False
+        if not self.user:
+            collectd.error('collectd-swift-stat: User Undefined')
+            read_plugin = False
+        if not self.password:
+            collectd.error('collectd-swift-stat: Password Undefined')
+            read_plugin = False
+        if not self.authurl:
+            collectd.error('collectd-swift-stat: AuthURL Undefined')
+            read_plugin = False
+        if not self.project:
+            collectd.error('collectd-swift-stat: Project Undefined')
+            read_plugin = False
 
-def read(data=None):
-    starttime = time.time()
+        if read_plugin:
+            collectd.info(
+                'swift_stat: Connecting with user={}, password={}, tenant={},'
+                ' auth_url={}'.format(
+                    self.user, self.password, self.project, self.authurl))
 
-    stats = swift_conn.head_account()
-
-    for m_instance, name in SWIFT_STATS.iteritems():
-        if m_instance in stats:
-            metric = collectd.Values()
-            metric.plugin = 'swift_stat'
-            metric.interval = INTERVAL
-            metric.type = 'gauge'
-            metric.type_instance = name
-            metric.values = [stats[m_instance]]
-            metric.dispatch()
+            self.swift_conn = self.create_swift_session()
+            collectd.register_read(self.read_swift_stat, self.interval)
         else:
-            collectd.error('swift_stat: Can not find: {}'.format(m_instance))
+            collectd.error('collectd_swift_stat: Invalid configuration')
 
-    timediff = time.time() - starttime
-    if timediff > INTERVAL:
-        collectd.warning(
-            'swift_stat: Took: {} > {}'.format(round(timediff, 2), INTERVAL))
+    def read_swift_stat(self, data=None):
+        starttime = time.time()
+
+        stats = self.swift_conn.head_account()
+
+        for m_instance, name in CollectdSwiftStat.SWIFT_STATS.iteritems():
+            if m_instance in stats:
+                metric = collectd.Values()
+                metric.plugin = 'swift_stat'
+                metric.interval = self.interval
+                metric.type = 'gauge'
+                metric.type_instance = '{}-{}'.format(self.prefix, name)
+                metric.values = [stats[m_instance]]
+                metric.dispatch()
+            else:
+                collectd.error(
+                    'swift_stat: Can not find: {}'.format(m_instance))
+
+        timediff = time.time() - starttime
+        if timediff > self.interval:
+            collectd.warning(
+                'swift_stat: Took: {} > {}'
+                .format(round(timediff, 2), self.interval))
+
+    def create_swift_session(self):
+        return Connection(
+            authurl=self.authurl, user=self.user, key=self.password,
+            tenant_name=self.project, auth_version='2.0')
 
 
-def create_swift_session():
-    return Connection(
-        authurl=swiftstat_authurl, user=swiftstat_username,
-        key=swiftstat_password, tenant_name=swiftstat_project,
-        auth_version='2.0')
-
-swiftstat_user = os.environ.get('SWIFTSTAT_USER')
-swiftstat_password = os.environ.get('SWIFTSTAT_PASSWORD')
-swiftstat_project = os.environ.get('SWIFTSTAT_PROJECT')
-swiftstat_authurl = os.environ.get('SWIFTSTAT_AUTHURL')
-
-collectd.info(
-    'swift_stat: Connecting with user={}, password={}, tenant={}, auth_url={}'
-    .format(
-        swiftstat_user, swiftstat_password, swiftstat_project,
-        swiftstat_authurl))
-
-swift_conn = create_swift_session()
-collectd.register_config(configure)
+collectd_swift_stat = CollectdSwiftStat()
+collectd.register_config(collectd_swift_stat.configure_callback)
