@@ -21,7 +21,10 @@ Metrics
 | swift_stat/gauge-$PREFIX-bytes
 | swift_stat/gauge-$PREFIX-containers
 | swift_stat/gauge-$PREFIX-objects
+|
 
+$PREFIX will be the configured Prefix value in the plugin configuration in
+collectd.conf
 
 Install / Configuration
 -----------------------
@@ -33,7 +36,6 @@ Install / Configuration
 
    ::
 
-       ```
        <LoadPlugin python>
          Globals true
        </LoadPlugin>
@@ -51,15 +53,12 @@ Install / Configuration
            Project "service"
          </Module>
        </Plugin>
-       ```
 
 2. Install plugin
 
    ::
 
-       ```
        [root@overcloud-controller-0 ~]# pip install collectd-swift-stat
-       ```
 
 3. Restart collectd
 
@@ -78,5 +77,5 @@ Resources
 .. _wiki.openstack.org/wiki/Swift: https://wiki.openstack.org/wiki/Swift
 .. _Collectd.org: https://collectd.org/
 
-.. |collectd-ceph-storage| image:: https://badge.fury.io/py/collectd-swift-stat.svg
+.. |collectd-swift-stat| image:: https://badge.fury.io/py/collectd-swift-stat.svg
     :target: https://pypi.python.org/pypi/collectd-swift-stat
