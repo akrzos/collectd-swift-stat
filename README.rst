@@ -49,7 +49,8 @@ Install / Configuration
            Prefix "gnocchi"
            User "gnocchi"
            Password "xxxxxxxxxxxxxxxxxxxxxxxxx"
-           AuthURL "http://172.21.0.10:5000/v2.0"
+           AuthURL "http://172.21.0.10:5000/v3"
+           AuthVersion "3.0"
            Project "service"
          </Module>
        </Plugin>
